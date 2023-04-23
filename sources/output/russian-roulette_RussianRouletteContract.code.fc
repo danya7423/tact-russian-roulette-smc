@@ -1,0 +1,350 @@
+#pragma version =0.4.2;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+slice __tact_verify_address(slice address) inline {
+    throw_unless(136, address.slice_bits() == 267);
+    var h = address.preload_uint(11);
+    throw_unless(136, (h == 1024) | (h == 1279));
+    throw_unless(137, h == 1024);
+    return address;
+}
+
+(slice, slice) __tact_load_address(slice cs) inline {
+    slice raw = cs~load_msg_addr();
+    return (cs, __tact_verify_address(raw));
+}
+
+builder __tact_store_address(builder b, slice address) inline {
+    return b.store_slice(__tact_verify_address(address));
+}
+
+forall X -> X __tact_not_null(X x) inline { throw_if(128, null?(x)); return x; }
+
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_context_sys;
+
+(int, slice, int, slice) __tact_context_get() inline { return __tact_context; }
+
+global int __tact_randomized;
+() __tact_prepare_random() impure inline {
+    if (null?(__tact_randomized)) {
+        randomize_lt();
+        __tact_randomized = true;
+    }
+}
+
+builder __tact_store_bool(builder b, int v) inline {
+    b = b.store_int(v, 1);
+    return b;
+}
+
+(cell, ()) __tact_dict_set_int_slice(cell d, int kl, int k, slice v) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set(d, kl, k, v), ());
+    }
+}
+
+slice __tact_dict_get_int_slice(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+tuple __tact_string_builder_start(builder b) inline {
+    return tpush(tpush(empty_tuple(), b), null());
+}
+
+tuple __tact_string_builder_start_comment() inline {
+    return __tact_string_builder_start(begin_cell().store_uint(0, 32));
+}
+
+cell __tact_string_builder_end(tuple builders) inline {
+    (builder b, tuple tail) = uncons(builders);
+    cell c = b.end_cell();
+    while(~ null?(tail)) {
+        (b, tail) = uncons(tail);
+        c = b.store_ref(c).end_cell();
+    }
+    return c;
+}
+
+((tuple), ()) __tact_string_builder_append(tuple builders, slice sc) inline_ref {
+    int sliceRefs = slice_refs(sc);
+    int sliceBits = slice_bits(sc);
+
+    while((sliceBits > 0) | (sliceRefs > 0)) {
+
+        ;; Load the current builder
+        (builder b, tuple tail) = uncons(builders);
+        int remBytes = 127 - (builder_bits(b) / 8);
+        int exBytes = sliceBits / 8;
+
+        ;; Append bits
+        int amount = min(remBytes, exBytes);
+        if (amount > 0) {
+            slice read = sc~load_bits(amount * 8);
+            b = b.store_slice(read);
+        }
+
+        ;; Update builders
+        builders = cons(b, tail);
+
+        ;; Check if we need to add a new cell and continue
+        if (exBytes - amount > 0) {
+            var bb = begin_cell();
+            builders = cons(bb, builders);
+            sliceBits = (exBytes - amount) * 8;
+        } elseif (sliceRefs > 0) {
+            sc = sc~load_ref().begin_parse();
+            sliceRefs = slice_refs(sc);
+            sliceBits = slice_bits(sc);
+        } else {
+            sliceBits = 0;
+            sliceRefs = 0;
+        }
+    }
+
+    return ((builders), ());
+}
+
+builder __gen_write_RussianRouletteContract(builder build_0, (slice, int, int, int, int, cell) v) inline {
+    var (v'owner, v'playersCount, v'chucksCount, v'bet, v'fee, v'players) = v;
+    build_0 = __tact_store_address(build_0, v'owner);
+    build_0 = build_0.store_uint(v'playersCount, 32);
+    build_0 = build_0.store_uint(v'chucksCount, 32);
+    build_0 = build_0.store_uint(v'bet, 32);
+    build_0 = build_0.store_uint(v'fee, 32);
+    build_0 = build_0.store_dict(v'players);
+    return build_0;
+}
+
+(slice, ((slice, int, int, int, int, cell))) __gen_read_RussianRouletteContract(slice sc_0) inline {
+    var v'owner = sc_0~__tact_load_address();
+    var v'playersCount = sc_0~load_uint(32);
+    var v'chucksCount = sc_0~load_uint(32);
+    var v'bet = sc_0~load_uint(32);
+    var v'fee = sc_0~load_uint(32);
+    var v'players = sc_0~load_dict();
+    return (sc_0, (v'owner, v'playersCount, v'chucksCount, v'bet, v'fee, v'players));
+}
+
+_ __gen_Context_get_sender((int, slice, int, slice) v) inline {
+    var (v'bounced, v'sender, v'value, v'raw) = v;
+    return v'sender;
+}
+
+(int, int, cell) __gen_Data_to_external(((int, int, cell)) v) inline {
+    var (v'bet, v'chucksCount, v'players) = v; 
+    return (v'bet, v'chucksCount, v'players);
+}
+
+(slice, ((slice, int, int, int))) __gen_read_$init$RussianRouletteContract(slice sc_0) inline {
+    var v'owner = sc_0~__tact_load_address();
+    var v'chucksCount = sc_0~load_int(257);
+    var v'bet = sc_0~load_int(257);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'fee = sc_1~load_int(257);
+    return (sc_0, (v'owner, v'chucksCount, v'bet, v'fee));
+}
+
+(slice, int, int, int, int, cell) $__gen_RussianRouletteContract_init(slice $owner, int $chucksCount, int $bet, int $fee) impure inline_ref {
+    var (($self'owner, $self'playersCount, $self'chucksCount, $self'bet, $self'fee, $self'players)) = (null(), 0, null(), null(), null(), null());
+    $self'owner = $owner;
+    $self'chucksCount = $chucksCount;
+    $self'bet = $bet;
+    $self'fee = $fee;
+    return ($self'owner, $self'playersCount, $self'chucksCount, $self'bet, $self'fee, $self'players);
+}
+
+(slice, int, int, int, int, cell) __gen_load_RussianRouletteContract() impure inline {
+    slice $sc = get_data().begin_parse();
+    __tact_context_sys = $sc~load_ref();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~__gen_read_RussianRouletteContract();
+    } else {
+        ;; Allow only workchain deployments
+        throw_unless(137, my_address().preload_uint(11) == 1024);
+        (slice owner, int chucksCount, int bet, int fee) = $sc~__gen_read_$init$RussianRouletteContract();
+        $sc.end_parse();
+        return $__gen_RussianRouletteContract_init(owner, chucksCount, bet, fee);
+    }
+}
+
+() __gen_store_RussianRouletteContract((slice, int, int, int, int, cell) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_ref(__tact_context_sys);
+    b = b.store_int(true, 1);
+    b = __gen_write_RussianRouletteContract(b, v);
+    set_data(b.end_cell());
+}
+
+;; String "Congratulations! You have won!"
+slice __gen_str_72600296() asm "B{b5ee9c7241010101002000003c436f6e67726174756c6174696f6e732120596f75206861766520776f6e21db4f3a72} B>boc <s PUSHSLICE";
+
+;; String "Fee"
+slice __gen_str_4165125089() asm "B{b5ee9c72410101010005000006466565cd2408da} B>boc <s PUSHSLICE";
+
+int $random(int $min, int $max) impure inline_ref {
+    __tact_prepare_random();
+    return ($min + rand(($max - $min)));
+}
+
+() $send((int, slice, int, int, cell, cell, cell) $params) impure inline_ref {
+    var (($params'bounce, $params'to, $params'value, $params'mode, $params'body, $params'code, $params'data)) = $params;
+    builder $b = begin_cell();
+    $b = store_int($b, 1, 2);
+    $b = __tact_store_bool($b, $params'bounce);
+    $b = store_int($b, 0, 3);
+    $b = __tact_store_address($b, $params'to);
+    $b = store_coins($b, $params'value);
+    $b = store_int($b, 0, ((((1 + 4) + 4) + 64) + 32));
+    if (((~ null?($params'code)) | (~ null?($params'data)))) {
+        $b = __tact_store_bool($b, true);
+        builder $bc = begin_cell();
+        $bc = __tact_store_bool($bc, false);
+        $bc = __tact_store_bool($bc, false);
+        if ((~ null?($params'code))) {
+            $bc = __tact_store_bool($bc, true);
+            $bc = store_ref($bc, __tact_not_null($params'code));
+        } else {
+            $bc = __tact_store_bool($bc, false);
+        }
+        if ((~ null?($params'data))) {
+            $bc = __tact_store_bool($bc, true);
+            $bc = store_ref($bc, __tact_not_null($params'data));
+        } else {
+            $bc = __tact_store_bool($bc, false);
+        }
+        $bc = __tact_store_bool($bc, false);
+        $b = __tact_store_bool($b, true);
+        $b = store_ref($b, end_cell($bc));
+    } else {
+        $b = __tact_store_bool($b, false);
+    }
+    cell $body = $params'body;
+    if ((~ null?($body))) {
+        $b = __tact_store_bool($b, true);
+        $b = store_ref($b, __tact_not_null($body));
+    } else {
+        $b = __tact_store_bool($b, false);
+    }
+    cell $c = end_cell($b);
+    send_raw_message($c, $params'mode);
+}
+
+cell $__gen_String_asComment(slice $self) impure inline_ref {
+    var ($self) = $self;
+    tuple $b = __tact_string_builder_start_comment();
+    $b~__tact_string_builder_append($self);
+    return __tact_string_builder_end($b);
+}
+
+((int, int, cell)) __gen_constructor_Data$bet_chucksCount_players(int bet, int chucksCount, cell players) inline {
+    return (bet, chucksCount, players);
+}
+
+(int, int, cell) $__gen_RussianRouletteContract_get_data((slice, int, int, int, int, cell) $self) impure inline_ref {
+    var (($self'owner, $self'playersCount, $self'chucksCount, $self'bet, $self'fee, $self'players)) = $self;
+    return __gen_constructor_Data$bet_chucksCount_players($self'bet, $self'chucksCount, $self'players);
+}
+
+_ $__gen_get_get_data() method_id(78985) {
+    var self = __gen_load_RussianRouletteContract();
+    var res = $__gen_RussianRouletteContract_get_data(self);
+    return __gen_Data_to_external(res);
+}
+
+((int, slice, int, int, cell, cell, cell)) __gen_constructor_SendParameters$to_value_bounce_body(slice to, int value, int bounce, cell body) inline {
+    return (bounce, to, value, 0, body, null(), null());
+}
+
+((int, slice, int, int, cell, cell, cell)) __gen_constructor_SendParameters$to_value_mode_bounce_body(slice to, int value, int mode, int bounce, cell body) inline {
+    return (bounce, to, value, mode, body, null(), null());
+}
+
+(((slice, int, int, int, int, cell)), ()) $__gen_RussianRouletteContract_receive((slice, int, int, int, int, cell) $self) impure inline {
+    var ($self'owner, $self'playersCount, $self'chucksCount, $self'bet, $self'fee, $self'players) = $self;
+    var ($ctx'bounced, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+    int $bet = $ctx'value;
+    throw_unless(17199, ($ctx'value == $self'bet));
+    $self'players~__tact_dict_set_int_slice(257, $self'playersCount, __gen_Context_get_sender(__tact_context_get()));
+    $self'playersCount = ($self'playersCount + 1);
+    if (($self'playersCount == $self'chucksCount)) {
+        int $chuck = $random(0, $self'chucksCount);
+        slice $winner = __tact_not_null(__tact_dict_get_int_slice($self'players, 257, $chuck));
+        $send(__gen_constructor_SendParameters$to_value_bounce_body($winner, (($self'bet * $self'chucksCount) - $self'fee), false, $__gen_String_asComment(__gen_str_72600296())));
+        $send(__gen_constructor_SendParameters$to_value_mode_bounce_body($self'owner, 0, (128 + 2), false, $__gen_String_asComment(__gen_str_4165125089())));
+    }
+    return (($self'owner, $self'playersCount, $self'chucksCount, $self'bet, $self'fee, $self'players), ());
+}
+
+((slice, int, int, int, int, cell), int) __gen_router_RussianRouletteContract((slice, int, int, int, int, cell) self, int msg_bounced, slice in_msg) impure inline_ref {
+    
+    ;; Parse incoming message
+    int op = 0;
+    if (slice_bits(in_msg) >= 32) {
+        op = in_msg.preload_uint(32);
+    }
+    
+    ;; Handle bounced messages
+    if (msg_bounced) {
+        return (self, true);
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (slice_bits(in_msg) <= 32)) {
+        self~$__gen_RussianRouletteContract_receive();
+        return (self, true);
+    }
+    
+    return (self, false);
+}
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    var msg_flags = cs~load_uint(4);
+    var msg_bounced = ((msg_flags & 1) == 1 ? true : false);
+    slice msg_sender_addr = __tact_verify_address(cs~load_msg_addr());
+    __tact_context = (msg_bounced, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var self = __gen_load_RussianRouletteContract();
+    
+    ;; Handle operation
+    int handled = self~__gen_router_RussianRouletteContract(msg_bounced, in_msg);
+    
+    ;; Throw if not handled
+    throw_unless(handled, 130);
+    
+    ;; Persist state
+    __gen_store_RussianRouletteContract(self);
+}
+
+_ supported_interfaces() method_id {
+    return (
+        "org.ton.introspection.v0"H >> 128,
+        "org.ton.abi.ipfs.v0"H >> 128,
+        "org.ton.deploy.lazy.v0"H >> 128,
+        "org.ton.chain.workchain.v0"H >> 128
+    );
+}
+
+_ get_abi_ipfs() {
+    return "ipfs://QmeKuzS7UVnVZcj5PXQj1fLCgZDM8Qin48keKCLd6jg8nD";
+}
+
+_ lazy_deployment_completed() {
+    return get_data().begin_parse().load_int(1);
+}
